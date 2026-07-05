@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evaluación — {{ nombre }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Hola, <span>{{ nombre }}</span></h1>
+    <p>Completa los indicadores para obtener tu nivel de riesgo estimado.</p>
+  </header>
+
+  <!-- PANTALLA: FORMULARIO -->
+  <div id="form-screen">
+
+    <div class="section-card">
+      <div class="section-label">Indicadores Psicoeducativos</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Autoeficacia académica</label>
+          <span class="hint">¿Qué tan capaz te sientes de manejar tus estudios?</span>
+          <div class="range-row">
+            <input type="range" id="autoeficacia" min="1" max="5" value="3" step="1" />
+            <span class="range-val" id="val-autoeficacia">3</span>
+          </div>
+          <span class="hint">1 = Muy baja · 5 = Muy alta</span>
+        </div>
+        <div class="field">
+          <label>Apoyo social percibido</label>
+          <span class="hint">Nivel de apoyo de familia, amigos o compañeros.</span>
+          <div class="range-row">
+            <input type="range" id="apoyo_social" min="1" max="5" value="3" step="1" />
+            <span class="range-val" id="val-apoyo_social">3</span>
+          </div>
+          <span class="hint">1 = Sin apoyo · 5 = Apoyo sólido</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">Indicadores Académicos</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Horas de estudio diarias</label>
+          <div class="range-row">
+            <input type="range" id="horas_estudio" min="1" max="10" value="4" step="1" />
+            <span class="range-val" id="val-horas_estudio">4</span>
+          </div>
+          <span class="hint">1 = 1 hora · 10 = 10 horas</span>
+        </div>
+        <div class="field">
+          <label>Promedio académico</label>
+          <div class="range-row">
+            <input type="range" id="promedio" min="1" max="10" value="7" step="0.5" />
+            <span class="range-val" id="val-promedio">7</span>
+          </div>
+          <span class="hint">Escala del 1 al 10</span>
+        </div>
+        <div class="field">
+          <label>Presión académica percibida</label>
+          <div class="range-row">
+            <input type="range" id="presion_academica" min="1" max="5" value="3" step="1" />
+            <span class="range-val" id="val-presion_academica">3</span>
+          </div>
+          <span class="hint">1 = Baja · 5 = Muy alta</span>
+        </div>
+        <div class="field">
+          <label>Días de ausentismo (último mes)</label>
+          <div class="range-row">
+            <input type="range" id="ausentismo" min="0" max="20" value="2" step="1" />
+            <span class="range-val" id="val-ausentismo">2</span>
+          </div>
+          <span class="hint">Número de clases perdidas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-label">Estilo de Vida</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Horas de sueño por noche</label>
+          <div class="range-row">
+            <input type="range" id="horas_sueno" min="4" max="10" value="7" step="0.5" />
+            <span class="range-val" id="val-horas_sueno">7</span>
+          </div>
+          <span class="hint">4 = Poco · 10 = Descanso completo</span>
+        </div>
+        <div class="field">
+          <label>Días de actividad física</label>
+          <div class="range-row">
+            <input type="range" id="actividad_fisica" min="0" max="7" value="3" step="1" />
+            <span class="range-val" id="val-actividad_fisica">3</span>
+          </div>
+          <span class="hint">Días por semana</span>
+        </div>
+        <div class="field">
+          <label>Consumo de cafeína</label>
+          <div class="range-row">
+            <input type="range" id="consumo_cafeina" min="0" max="5" value="1" step="1" />
+            <span class="range-val" id="val-consumo_cafeina">1</span>
+          </div>
+          <span class="hint">Bebidas con cafeína al día (café, energizantes)</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()">Evaluar nivel de ansiedad</button>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <!-- PANTALLA: RESULTADO -->
+  <div id="result-screen">
+    <div class="result-card">
+      <div class="risk-badge" id="risk-badge"></div>
+      <p class="result-description" id="result-desc"></p>
+      <div class="prob-title">Distribución de probabilidad</div>
+      <div id="prob-bars"></div>
+    </div>
+
+    <div class="tips-card">
+      <h3>Recomendaciones</h3>
+      <ul id="tips-list"></ul>
+    </div>
+
+    <div class="result-actions">
+      <button class="back-btn" onclick="goBack()">← Nueva evaluación</button>
+      <a href="/historial" class="history-btn">Ver historial</a>
+    </div>
+    <div class="footer-link" style="margin-top: 16px;">
+      <a href="/">Cambiar estudiante</a>
+    </div>
+  </div>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>

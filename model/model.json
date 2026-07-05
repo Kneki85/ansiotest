@@ -1,0 +1,19 @@
+{
+  "features": [
+    "autoeficacia",
+    "apoyo_social",
+    "horas_estudio",
+    "promedio",
+    "presion_academica",
+    "ausentismo",
+    "horas_sueno",
+    "actividad_fisica",
+    "consumo_cafeina"
+  ],
+  "classes": [
+    "Bajo",
+    "Moderado",
+    "Alto"
+  ],
+  "version": "1.0-reentrenado"
+}

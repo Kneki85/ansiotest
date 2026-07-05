@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Historial de Evaluaciones</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Historial de <span>Evaluaciones</span></h1>
+    <p>Registro de todas las evaluaciones realizadas en esta sesión.</p>
+  </header>
+
+  {% if registros %}
+  <div class="historial-meta">
+    <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}</span>
+    <form action="/historial/limpiar" method="POST" onsubmit="return confirm('¿Limpiar todo el historial?')">
+      <button type="submit" class="clear-btn">Limpiar historial</button>
+    </form>
+  </div>
+
+  <div class="historial-list">
+    {% for r in registros %}
+    <div class="historial-card">
+      <div class="historial-info">
+        <span class="historial-nombre">{{ r.nombre }}</span>
+        <span class="historial-fecha">{{ r.fecha }}</span>
+      </div>
+      <div class="historial-badge {{ r.color }}">{{ r.nivel }}</div>
+      <div class="historial-probs">
+        {% for label, data in r.probabilidades.items() %}
+        <div class="mini-bar-row">
+          <span class="mini-label">{{ label }}</span>
+          <div class="bar-track">
+            <div class="bar-fill {{ data.color }}" style="width: {{ data.pct }}%"></div>
+          </div>
+          <span class="mini-pct">{{ data.pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <p>No hay evaluaciones registradas todavía.</p>
+    <a href="/" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
+      Realizar primera evaluación
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="footer-link">
+    <a href="/">← Volver al inicio</a>
+  </div>
+</div>
+</body>
+</html>
