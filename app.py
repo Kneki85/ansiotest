@@ -60,6 +60,76 @@ def init_db() -> None:
 
 init_db()
 
+
+# --- Estructuras de datos propias (vistas en clase) ---
+
+class NodoLista:
+    """Nodo individual de una lista enlazada."""
+
+    def __init__(self, dato):
+        self.dato = dato
+        self.siguiente = None
+
+
+class ListaEnlazada:
+    """Lista enlazada simple. Se usa para armar las recomendaciones (tips)
+    de cada nivel de riesgo, recorriéndolas nodo por nodo en vez de usar
+    una lista de Python común."""
+
+    def __init__(self):
+        self.cabeza = None
+
+    def agregar(self, dato) -> None:
+        nuevo_nodo = NodoLista(dato)
+        if self.cabeza is None:
+            self.cabeza = nuevo_nodo
+            return
+        actual = self.cabeza
+        while actual.siguiente is not None:
+            actual = actual.siguiente
+        actual.siguiente = nuevo_nodo
+
+    def a_lista(self) -> list:
+        """Recorre la lista enlazada y arma una lista de Python con sus datos
+        (necesario porque JSON no puede serializar nodos directamente)."""
+        resultado = []
+        actual = self.cabeza
+        while actual is not None:
+            resultado.append(actual.dato)
+            actual = actual.siguiente
+        return resultado
+
+
+class Pila:
+    """Pila (estructura LIFO). Se usa para poder deshacer la última
+    evaluación registrada en el historial: cada vez que se guarda una
+    evaluación, se apila su id; al deshacer, se desapila y se borra
+    esa evaluación específica de la base de datos."""
+
+    def __init__(self):
+        self.elementos: list = []
+
+    def apilar(self, dato) -> None:
+        self.elementos.append(dato)
+
+    def desapilar(self):
+        if self.esta_vacia():
+            return None
+        return self.elementos.pop()
+
+    def ver_tope(self):
+        if self.esta_vacia():
+            return None
+        return self.elementos[-1]
+
+    def esta_vacia(self) -> bool:
+        return len(self.elementos) == 0
+
+
+# Pila global en memoria: guarda el id de cada evaluación reciente,
+# para poder deshacer la última con un clic.
+pila_deshacer = Pila()
+
 RISK_INFO: dict[str, dict] = {
     "Bajo": {
         "color": "green",
@@ -139,7 +209,7 @@ def predict():
             for i, p in enumerate(probabilities)
         }
         with get_db() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT INTO evaluaciones (nombre, nivel, color, fecha, probabilidades) "
                 "VALUES (?, ?, ?, ?, ?)",
                 (
@@ -150,6 +220,9 @@ def predict():
                     json.dumps(probabilidades_dict, ensure_ascii=False),
                 ),
             )
+            # Apilamos el id recién insertado para poder deshacerlo después
+            pila_deshacer.apilar(cursor.lastrowid)
+
             # Si se pasa del tope, borrar los registros más antiguos
             conn.execute(
                 "DELETE FROM evaluaciones WHERE id NOT IN ("
@@ -158,12 +231,17 @@ def predict():
                 (MAX_REGISTROS,),
             )
 
+        # Armamos las recomendaciones recorriendo una lista enlazada propia
+        lista_tips = ListaEnlazada()
+        for tip in info["tips"]:
+            lista_tips.agregar(tip)
+
         return jsonify({
             "level": label,
             "color": info["color"],
             "icon": info["icon"],
             "description": info["description"],
-            "tips": info["tips"],
+            "tips": lista_tips.a_lista(),
             "probabilities": {
                 CLASSES[i]: round(float(p) * 100, 1)
                 for i, p in enumerate(probabilities)
@@ -201,6 +279,17 @@ def ver_historial():
 def limpiar_historial():
     with get_db() as conn:
         conn.execute("DELETE FROM evaluaciones")
+    pila_deshacer.elementos.clear()
+    return redirect(url_for("ver_historial"))
+
+
+@app.route("/historial/deshacer", methods=["POST"])
+def deshacer_historial():
+    # Desapilamos el id de la última evaluación registrada y la borramos
+    ultimo_id = pila_deshacer.desapilar()
+    if ultimo_id is not None:
+        with get_db() as conn:
+            conn.execute("DELETE FROM evaluaciones WHERE id = ?", (ultimo_id,))
     return redirect(url_for("ver_historial"))
 
 
