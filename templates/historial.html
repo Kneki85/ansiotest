@@ -18,9 +18,14 @@
   {% if registros %}
   <div class="historial-meta">
     <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}</span>
-    <form action="/historial/limpiar" method="POST" onsubmit="return confirm('¿Limpiar todo el historial?')">
-      <button type="submit" class="clear-btn">Limpiar historial</button>
-    </form>
+    <div style="display:flex; gap:10px;">
+      <form action="/historial/deshacer" method="POST">
+        <button type="submit" class="clear-btn">↩ Deshacer última</button>
+      </form>
+      <form action="/historial/limpiar" method="POST" onsubmit="return confirm('¿Limpiar todo el historial?')">
+        <button type="submit" class="clear-btn">Limpiar historial</button>
+      </form>
+    </div>
   </div>
 
   <div class="historial-list">
