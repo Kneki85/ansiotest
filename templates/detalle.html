@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detalle — {{ registro.nombre }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="container narrow">
+  <header>
+    <h1>Detalle de <span>Evaluación</span></h1>
+    <p>{{ registro.nombre }} · {{ registro.fecha }}</p>
+  </header>
+
+  <div class="result-card">
+    <div class="risk-badge {{ registro.color }}">
+      <span>Riesgo {{ registro.nivel }}</span>
+    </div>
+    <div class="prob-title">Distribución de probabilidad</div>
+    <div id="prob-bars">
+      {% for label, data in registro.probabilidades.items() %}
+      <div class="prob-row">
+        <span class="label">{{ label }}</span>
+        <div class="bar-track">
+          <div class="bar-fill {{ data.color }}" style="width: {{ data.pct }}%"></div>
+        </div>
+        <span class="pct">{{ data.pct }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- anterior/siguiente con la lista doblemente enlazada -->
+  <div class="result-actions">
+    {% if id_mas_reciente %}
+    <a href="/historial/detalle/{{ id_mas_reciente }}" class="back-btn">← Más reciente</a>
+    {% else %}
+    <span class="back-btn" style="opacity:0.4;">← Más reciente</span>
+    {% endif %}
+
+    {% if id_mas_antiguo %}
+    <a href="/historial/detalle/{{ id_mas_antiguo }}" class="history-btn">Más antiguo →</a>
+    {% else %}
+    <span class="history-btn" style="opacity:0.4;">Más antiguo →</span>
+    {% endif %}
+  </div>
+
+  <div class="footer-link" style="margin-top: 16px;">
+    <a href="/historial">← Volver al historial</a>
+  </div>
+</div>
+</body>
+</html>

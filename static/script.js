@@ -74,6 +74,19 @@ function renderResult(data) {
   // Recomendaciones
   document.getElementById("tips-list").innerHTML =
     data.tips.map(t => `<li>${t}</li>`).join("");
+
+  // Tendencia reciente (arreglo circular de los últimos niveles)
+  const tendenciaTitle = document.getElementById("tendencia-title");
+  const tendenciaEl = document.getElementById("tendencia-dots");
+  if (data.tendencia && data.tendencia.length > 1) {
+    tendenciaTitle.style.display = "block";
+    tendenciaEl.innerHTML = data.tendencia
+      .map(nivel => `<span class="risk-badge ${colorMap[nivel]}" style="display:inline-flex; margin:2px; padding:4px 10px; font-size:0.75rem;">${nivel}</span>`)
+      .join("");
+  } else {
+    tendenciaTitle.style.display = "none";
+    tendenciaEl.innerHTML = "";
+  }
 }
 
 function showScreen(name) {

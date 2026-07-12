@@ -1,3 +1,8 @@
+NOVEDAD: LOGIN
+
+Ahora la app pide iniciar sesión. La primera vez, entra a /registro y crea tu
+cuenta (nombre, correo, contraseña). Las veces siguientes usa /login.
+
 CONFIGURAR LA BASE DE DATOS (MySQL) — SOLO LA PRIMERA VEZ
 
 1. Copia el archivo ".env.example" y renómbralo a ".env"

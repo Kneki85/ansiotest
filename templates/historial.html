@@ -12,12 +12,30 @@
 <div class="container">
   <header>
     <h1>Historial de <span>Evaluaciones</span></h1>
-    <p>Registro de todas las evaluaciones realizadas en esta sesión.</p>
+    <p>Registro de todas las evaluaciones realizadas.</p>
   </header>
+
+  <!-- buscador (arbol) + cola de busquedas recientes -->
+  <form action="/historial" method="GET" class="name-form" style="margin-bottom: 16px;">
+    <div class="field">
+      <label for="q">Buscar por nombre</label>
+      <input type="text" id="q" name="q" placeholder="Ej: María" value="{{ query or '' }}" />
+    </div>
+    <button type="submit" class="submit-btn">Buscar</button>
+  </form>
+
+  {% if busquedas_recientes %}
+  <div class="footer-link" style="margin-bottom: 16px; text-align:left;">
+    <span>Búsquedas recientes: </span>
+    {% for b in busquedas_recientes %}
+    <a href="/historial?q={{ b }}" style="margin-right:8px;">{{ b }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if registros %}
   <div class="historial-meta">
-    <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}</span>
+    <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}{% if query %} para "{{ query }}"{% endif %}</span>
     <div style="display:flex; gap:10px;">
       <form action="/historial/deshacer" method="POST">
         <button type="submit" class="clear-btn">↩ Deshacer última</button>
@@ -30,7 +48,7 @@
 
   <div class="historial-list">
     {% for r in registros %}
-    <div class="historial-card">
+    <a href="/historial/detalle/{{ r.id }}" class="historial-card" style="text-decoration:none; color:inherit; display:block;">
       <div class="historial-info">
         <span class="historial-nombre">{{ r.nombre }}</span>
         <span class="historial-fecha">{{ r.fecha }}</span>
@@ -47,16 +65,20 @@
         </div>
         {% endfor %}
       </div>
-    </div>
+    </a>
     {% endfor %}
   </div>
 
   {% else %}
   <div class="empty-state">
     <div class="empty-icon">📋</div>
+    {% if query %}
+    <p>No se encontraron evaluaciones para "{{ query }}".</p>
+    {% else %}
     <p>No hay evaluaciones registradas todavía.</p>
+    {% endif %}
     <a href="/" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
-      Realizar primera evaluación
+      {% if query %}Volver al historial{% else %}Realizar primera evaluación{% endif %}
     </a>
   </div>
   {% endif %}

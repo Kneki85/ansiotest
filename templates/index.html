@@ -16,28 +16,19 @@
   </header>
 
   <div class="section-card center-card">
-    <div class="section-label">Registro</div>
-    <p class="card-intro">Ingresa tu nombre para comenzar. Tus resultados quedarán registrados en el historial.</p>
+    <div class="section-label">Bienvenido/a</div>
+    <p class="card-intro">Hola, <strong>{{ nombre }}</strong>. Tus resultados quedarán registrados en tu historial.</p>
 
-    <form action="/iniciar" method="POST" class="name-form">
-      <div class="field">
-        <label for="nombre">Nombre del estudiante</label>
-        <input
-          type="text"
-          id="nombre"
-          name="nombre"
-          placeholder="Ej: María García"
-          maxlength="80"
-          required
-          autofocus
-        />
-      </div>
-      <button type="submit" class="submit-btn">Comenzar evaluación →</button>
-    </form>
+    <a href="/evaluacion" class="submit-btn" style="display:block; text-align:center; text-decoration:none;">
+      Comenzar evaluación →
+    </a>
   </div>
 
   <div class="footer-link">
     <a href="/historial">Ver historial de evaluaciones</a>
+  </div>
+  <div class="footer-link">
+    <a href="/logout">Cerrar sesión</a>
   </div>
 </div>
 </body>

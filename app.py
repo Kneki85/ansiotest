@@ -6,6 +6,7 @@ import json
 import os
 import pickle
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -13,6 +14,7 @@ import numpy as np
 import pymysql
 import pymysql.cursors
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "model"
@@ -99,6 +101,15 @@ def init_db() -> None:
                     probabilidades TEXT NOT NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nombre VARCHAR(120) NOT NULL,
+                    email VARCHAR(150) NOT NULL UNIQUE,
+                    password_hash VARCHAR(255) NOT NULL,
+                    fecha_registro VARCHAR(20) NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -107,21 +118,20 @@ def init_db() -> None:
 init_db()
 
 
-# --- Estructuras de datos propias (vistas en clase) ---
+# --- Estructuras de datos (las que pide el curso) ---
+# ya tenia lista enlazada y pila del entregable anterior, lo demas
+# (cola, lista doble, arreglo y arbol) lo meti ahora que el profe pidio
+# que se vea el uso de todas
 
 class NodoLista:
-    """Nodo individual de una lista enlazada."""
-
+    # nodo de la lista enlazada simple
     def __init__(self, dato):
         self.dato = dato
         self.siguiente = None
 
 
 class ListaEnlazada:
-    """Lista enlazada simple. Se usa para armar las recomendaciones (tips)
-    de cada nivel de riesgo, recorriéndolas nodo por nodo en vez de usar
-    una lista de Python común."""
-
+    # lista enlazada simple, la uso para las recomendaciones (tips) segun el nivel
     def __init__(self):
         self.cabeza = None
 
@@ -136,8 +146,7 @@ class ListaEnlazada:
         actual.siguiente = nuevo_nodo
 
     def a_lista(self) -> list:
-        """Recorre la lista enlazada y arma una lista de Python con sus datos
-        (necesario porque JSON no puede serializar nodos directamente)."""
+        # paso los nodos a una lista normal pq el jsonify no puede con nodos
         resultado = []
         actual = self.cabeza
         while actual is not None:
@@ -147,11 +156,9 @@ class ListaEnlazada:
 
 
 class Pila:
-    """Pila (estructura LIFO). Se usa para poder deshacer la última
-    evaluación registrada en el historial: cada vez que se guarda una
-    evaluación, se apila su id; al deshacer, se desapila y se borra
-    esa evaluación específica de la base de datos."""
-
+    # pila (LIFO) para el botón de deshacer del historial.
+    # cuando guardo una evaluacion apilo su id, si le doy a deshacer
+    # desapilo y borro esa fila de la bd
     def __init__(self):
         self.elementos: list = []
 
@@ -172,9 +179,139 @@ class Pila:
         return len(self.elementos) == 0
 
 
-# Pila global en memoria: guarda el id de cada evaluación reciente,
-# para poder deshacer la última con un clic.
 pila_deshacer = Pila()
+
+
+# --- de aca para abajo es lo nuevo que pidio el profe ---
+
+class Cola:
+    # cola (FIFO), la uso para las busquedas recientes del historial.
+    # la primera busqueda que entra es la primera que sale cuando se
+    # llena (max 5)
+    def __init__(self, capacidad: int = 5):
+        self.elementos: list = []
+        self.capacidad = capacidad
+
+    def encolar(self, dato) -> None:
+        # si ya estaba esa busqueda la quito y la vuelvo a meter al final
+        if dato in self.elementos:
+            self.elementos.remove(dato)
+        self.elementos.append(dato)
+        if len(self.elementos) > self.capacidad:
+            self.desencolar()
+
+    def desencolar(self):
+        if self.esta_vacia():
+            return None
+        return self.elementos.pop(0)
+
+    def esta_vacia(self) -> bool:
+        return len(self.elementos) == 0
+
+    def a_lista(self) -> list:
+        return list(reversed(self.elementos))  # la mas reciente primero
+
+
+class NodoDoble:
+    # nodo con puntero al anterior y al siguiente (para recorrer los 2 lados)
+    def __init__(self, dato):
+        self.dato = dato
+        self.anterior = None
+        self.siguiente = None
+
+
+class ListaDoble:
+    # lista doblemente enlazada, para moverme entre registros del
+    # historial (anterior/siguiente) sin usar indices de una lista comun
+    def __init__(self):
+        self.cabeza = None
+        self.cola = None
+
+    def agregar(self, dato) -> None:
+        nuevo_nodo = NodoDoble(dato)
+        if self.cabeza is None:
+            self.cabeza = nuevo_nodo
+            self.cola = nuevo_nodo
+            return
+        nuevo_nodo.anterior = self.cola
+        self.cola.siguiente = nuevo_nodo
+        self.cola = nuevo_nodo
+
+    def buscar_nodo(self, condicion):
+        # recorre y devuelve el primer nodo que cumpla la condicion
+        actual = self.cabeza
+        while actual is not None:
+            if condicion(actual.dato):
+                return actual
+            actual = actual.siguiente
+        return None
+
+
+class ArregloCircular:
+    # arreglo de tamaño fijo (buffer circular). a diferencia de una lista
+    # normal que crece sin limite, este tiene capacidad fija y cuando se
+    # llena el dato nuevo pisa al mas viejo. lo uso para la tendencia de
+    # los ultimos resultados del estudiante
+    def __init__(self, capacidad: int = 5):
+        self.capacidad = capacidad
+        self.datos = [None] * capacidad
+        self.siguiente_indice = 0
+        self.cantidad = 0
+
+    def agregar(self, dato) -> None:
+        self.datos[self.siguiente_indice] = dato
+        self.siguiente_indice = (self.siguiente_indice + 1) % self.capacidad
+        self.cantidad = min(self.cantidad + 1, self.capacidad)
+
+    def obtener_todos(self) -> list:
+        # devuelve del mas viejo al mas nuevo dentro de la ventana actual
+        if self.cantidad < self.capacidad:
+            return [d for d in self.datos[: self.cantidad]]
+        inicio = self.siguiente_indice
+        return self.datos[inicio:] + self.datos[:inicio]
+
+
+class NodoArbol:
+    def __init__(self, clave, dato):
+        self.clave = clave
+        self.dato = dato
+        self.izquierda = None
+        self.derecha = None
+
+
+class ArbolBusqueda:
+    # arbol binario de busqueda, ordenado por nombre en minuscula.
+    # lo uso para el buscador del historial: inserto cada registro como
+    # nodo y despues recorro el arbol "en orden" para listar lo que
+    # coincida con la busqueda
+    def __init__(self):
+        self.raiz = None
+
+    def insertar(self, clave, dato) -> None:
+        self.raiz = self._insertar_nodo(self.raiz, clave, dato)
+
+    def _insertar_nodo(self, nodo, clave, dato):
+        if nodo is None:
+            return NodoArbol(clave, dato)
+        if clave < nodo.clave:
+            nodo.izquierda = self._insertar_nodo(nodo.izquierda, clave, dato)
+        else:
+            nodo.derecha = self._insertar_nodo(nodo.derecha, clave, dato)
+        return nodo
+
+    def buscar_por_texto(self, texto: str) -> list:
+        # recorrido en orden (in-order), ya sale ordenado alfabeticamente
+        resultados = []
+        self._recorrer_en_orden(self.raiz, texto.lower().strip(), resultados)
+        return resultados
+
+    def _recorrer_en_orden(self, nodo, texto, resultados) -> None:
+        if nodo is None:
+            return
+        self._recorrer_en_orden(nodo.izquierda, texto, resultados)
+        if texto == "" or texto in nodo.clave:
+            resultados.append(nodo.dato)
+        self._recorrer_en_orden(nodo.derecha, texto, resultados)
 
 RISK_INFO: dict[str, dict] = {
     "Bajo": {
@@ -212,30 +349,108 @@ RISK_INFO: dict[str, dict] = {
 
 # --- Rutas ---
 
+def login_required(vista):
+    # decorador para proteger rutas, si no hay sesion te manda al login
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if not session.get("usuario_id"):
+            return redirect(url_for("login"))
+        return vista(*args, **kwargs)
+
+    return envoltura
+
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    error = None
+    if request.method == "POST":
+        nombre = request.form.get("nombre", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not nombre or not email or not password:
+            error = "Completa todos los campos."
+        elif len(password) < 4:
+            error = "La contraseña debe tener al menos 4 caracteres."
+        else:
+            conn = get_db()
+            nuevo_id = None
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
+                    if cursor.fetchone():
+                        error = "Ya existe una cuenta con ese correo."
+                    else:
+                        cursor.execute(
+                            "INSERT INTO usuarios (nombre, email, password_hash, fecha_registro) "
+                            "VALUES (%s, %s, %s, %s)",
+                            (
+                                nombre,
+                                email,
+                                generate_password_hash(password),
+                                datetime.now(ZONA_LIMA).strftime("%d/%m/%Y %H:%M"),
+                            ),
+                        )
+                        nuevo_id = cursor.lastrowid
+                conn.commit()
+            finally:
+                conn.close()
+
+            if not error and nuevo_id is not None:
+                session["usuario_id"] = nuevo_id
+                session["nombre"] = nombre
+                return redirect(url_for("index"))
+
+    return render_template("registro.html", error=error)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, nombre, password_hash FROM usuarios WHERE email = %s",
+                    (email,),
+                )
+                usuario = cursor.fetchone()
+        finally:
+            conn.close()
+
+        if usuario and check_password_hash(usuario["password_hash"], password):
+            session["usuario_id"] = usuario["id"]
+            session["nombre"] = usuario["nombre"]
+            return redirect(url_for("index"))
+        error = "Correo o contraseña incorrectos."
+
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
-
-
-@app.route("/iniciar", methods=["POST"])
-def iniciar():
-    nombre = request.form.get("nombre", "").strip()
-    if not nombre:
-        return redirect(url_for("index"))
-    # Guardar nombre en sesión y redirigir a evaluación
-    session["nombre"] = nombre
-    return redirect(url_for("evaluacion"))
+    return render_template("index.html", nombre=session.get("nombre"))
 
 
 @app.route("/evaluacion")
+@login_required
 def evaluacion():
-    nombre = session.get("nombre")
-    if not nombre:
-        return redirect(url_for("index"))
-    return render_template("evaluacion.html", nombre=nombre)
+    return render_template("evaluacion.html", nombre=session.get("nombre"))
 
 
 @app.route("/predict", methods=["POST"])
+@login_required
 def predict():
     nombre = session.get("nombre", "Estudiante")
     try:
@@ -287,10 +502,18 @@ def predict():
         finally:
             conn.close()
 
-        # Armamos las recomendaciones recorriendo una lista enlazada propia
+        # armamos las recomendaciones recorriendo la lista enlazada
         lista_tips = ListaEnlazada()
         for tip in info["tips"]:
             lista_tips.agregar(tip)
+
+        # arreglo circular con los ultimos 5 niveles, para la tendencia
+        buffer_tendencia = ArregloCircular(capacidad=5)
+        for nivel_previo in session.get("tendencia", []):
+            buffer_tendencia.agregar(nivel_previo)
+        buffer_tendencia.agregar(label)
+        tendencia_actual = buffer_tendencia.obtener_todos()
+        session["tendencia"] = tendencia_actual
 
         return jsonify({
             "level": label,
@@ -298,6 +521,7 @@ def predict():
             "icon": info["icon"],
             "description": info["description"],
             "tips": lista_tips.a_lista(),
+            "tendencia": tendencia_actual,
             "probabilities": {
                 CLASSES[i]: round(float(p) * 100, 1)
                 for i, p in enumerate(probabilities)
@@ -310,21 +534,25 @@ def predict():
 
 
 @app.route("/historial")
+@login_required
 def ver_historial():
-    # Mostrar lista de registros, más reciente primero
+    query = request.args.get("q", "").strip()
+
+    # lista completa, mas reciente primero (como ya estaba antes)
     conn = get_db()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT nombre, nivel, color, fecha, probabilidades "
+                "SELECT id, nombre, nivel, color, fecha, probabilidades "
                 "FROM evaluaciones ORDER BY id DESC"
             )
             filas = cursor.fetchall()
     finally:
         conn.close()
 
-    registros = [
+    todos_los_registros = [
         {
+            "id": fila["id"],
             "nombre": fila["nombre"],
             "nivel": fila["nivel"],
             "color": fila["color"],
@@ -333,10 +561,81 @@ def ver_historial():
         }
         for fila in filas
     ]
-    return render_template("historial.html", registros=registros)
+
+    if query:
+        # buscador con arbol: meto cada registro por nombre y despues
+        # recorro el arbol en orden buscando coincidencias
+        arbol = ArbolBusqueda()
+        for registro in todos_los_registros:
+            arbol.insertar(registro["nombre"].lower(), registro)
+        registros = arbol.buscar_por_texto(query)
+
+        # guardo la busqueda en la cola de "recientes"
+        cola_busquedas = Cola(capacidad=5)
+        cola_busquedas.elementos = session.get("busquedas_recientes", [])
+        cola_busquedas.encolar(query)
+        session["busquedas_recientes"] = cola_busquedas.elementos
+    else:
+        registros = todos_los_registros
+
+    busquedas_recientes = list(reversed(session.get("busquedas_recientes", [])))
+
+    return render_template(
+        "historial.html",
+        registros=registros,
+        query=query,
+        busquedas_recientes=busquedas_recientes,
+    )
+
+
+@app.route("/historial/detalle/<int:registro_id>")
+@login_required
+def detalle_historial(registro_id):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, nombre, nivel, color, fecha, probabilidades "
+                "FROM evaluaciones ORDER BY id DESC"
+            )
+            filas = cursor.fetchall()
+    finally:
+        conn.close()
+
+    # armo la lista doble en el mismo orden que se ve en el historial,
+    # para poder saltar al registro anterior/siguiente
+    lista = ListaDoble()
+    for fila in filas:
+        lista.agregar(fila)
+
+    nodo = lista.buscar_nodo(lambda f: f["id"] == registro_id)
+    if nodo is None:
+        return redirect(url_for("ver_historial"))
+
+    registro = {
+        "id": nodo.dato["id"],
+        "nombre": nodo.dato["nombre"],
+        "nivel": nodo.dato["nivel"],
+        "color": nodo.dato["color"],
+        "fecha": nodo.dato["fecha"],
+        "probabilidades": json.loads(nodo.dato["probabilidades"]),
+    }
+    # ojo: "siguiente" en la lista es hacia atras en el tiempo (mas viejo)
+    # y "anterior" es hacia adelante (mas reciente), por como los fui
+    # agregando (el mas nuevo primero)
+    id_mas_antiguo = nodo.siguiente.dato["id"] if nodo.siguiente else None
+    id_mas_reciente = nodo.anterior.dato["id"] if nodo.anterior else None
+
+    return render_template(
+        "detalle.html",
+        registro=registro,
+        id_mas_antiguo=id_mas_antiguo,
+        id_mas_reciente=id_mas_reciente,
+    )
 
 
 @app.route("/historial/limpiar", methods=["POST"])
+@login_required
 def limpiar_historial():
     conn = get_db()
     try:
@@ -350,6 +649,7 @@ def limpiar_historial():
 
 
 @app.route("/historial/deshacer", methods=["POST"])
+@login_required
 def deshacer_historial():
     # Desapilamos el id de la última evaluación registrada y la borramos
     ultimo_id = pila_deshacer.desapilar()
