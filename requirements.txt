@@ -3,4 +3,6 @@ scikit-learn==1.8.0
 pandas>=2.2.0,<3.0
 numpy>=1.26.0,<3.0
 gunicorn>=22.0.0,<23.0
+PyMySQL>=1.1.0,<2.0
+python-dotenv>=1.0.0,<2.0
 

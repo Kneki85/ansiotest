@@ -1,3 +1,9 @@
+CONFIGURAR LA BASE DE DATOS (MySQL) — SOLO LA PRIMERA VEZ
+
+1. Copia el archivo ".env.example" y renómbralo a ".env"
+2. Rellena tus datos reales de Aiven (host, puerto, usuario, clave, nombre de la base)
+3. Nunca subas el archivo ".env" a GitHub (ya está en .gitignore, no hace falta que hagas nada extra)
+
 INSTALAR DEPENDENCIAS
 
 pip install -r requirements.txt

@@ -3,27 +3,52 @@ ansiedad_app v2 — Flask backend con registro de estudiantes e historial
 """
 
 import json
+import os
 import pickle
-import sqlite3
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
+import pymysql
+import pymysql.cursors
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "model"
-DB_PATH = BASE_DIR / "historial.db"
 MAX_REGISTROS = 100
 ZONA_LIMA = ZoneInfo("America/Lima")
+
+# Intentamos cargar un archivo .env local (si existe) para no tener que
+# escribir las credenciales de la base de datos a mano cada vez que se
+# prueba en la propia compu. En Render, estas variables se configuran
+# directamente en el panel de "Environment", no con este archivo.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# Credenciales de la base de datos MySQL, leídas desde variables de entorno.
+# NUNCA se escriben directo en el código, porque este repositorio es público.
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "3306"))
+DB_USER = os.environ.get("DB_USER", "root")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+DB_NAME = os.environ.get("DB_NAME", "ansiedad_app")
+
+# Aiven (y la mayoría de proveedores de MySQL en la nube) exige conexiones
+# cifradas (SSL). Si se define DB_SSL_CA (ruta al certificado que te da
+# Aiven), la conexión se hace con SSL. Si no está definida (por ejemplo,
+# al probar con un MySQL local que no lo exige), se conecta sin SSL.
+DB_SSL_CA = os.environ.get("DB_SSL_CA", "")
 
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
-app.secret_key = "ansiedad_app_secret_key_2024"
+app.secret_key = os.environ.get("SECRET_KEY", "ansiedad_app_secret_key_2024")
 
 # Carga del modelo y metadatos
 with open(MODEL_DIR / "model.pkl", "rb") as f:
@@ -36,26 +61,47 @@ CLASSES: list[str] = meta["classes"]
 FEATURES: list[str] = meta["features"]
 
 
-def get_db() -> sqlite3.Connection:
-    """Abre una conexión nueva a la base de datos SQLite."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_db() -> pymysql.connections.Connection:
+    """Abre una conexión nueva a la base de datos MySQL.
+
+    cursorclass=DictCursor hace que cada fila se pueda leer como
+    diccionario (fila["nombre"]), igual que hacíamos antes con
+    sqlite3.Row.
+    """
+    conexion_kwargs = dict(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=False,
+    )
+    if DB_SSL_CA:
+        conexion_kwargs["ssl_ca"] = DB_SSL_CA
+        conexion_kwargs["ssl_verify_cert"] = True
+    return pymysql.connect(**conexion_kwargs)
 
 
 def init_db() -> None:
-    """Crea la tabla de historial si no existe (persiste entre reinicios)."""
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS evaluaciones (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                nivel TEXT NOT NULL,
-                color TEXT NOT NULL,
-                fecha TEXT NOT NULL,
-                probabilidades TEXT NOT NULL
-            )
-        """)
+    """Crea la tabla de historial si no existe (persiste entre reinicios,
+    porque ahora vive en un servidor MySQL aparte, no en un archivo local)."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS evaluaciones (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nombre VARCHAR(120) NOT NULL,
+                    nivel VARCHAR(20) NOT NULL,
+                    color VARCHAR(20) NOT NULL,
+                    fecha VARCHAR(20) NOT NULL,
+                    probabilidades TEXT NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+        conn.commit()
+    finally:
+        conn.close()
 
 
 init_db()
@@ -208,28 +254,38 @@ def predict():
             CLASSES[i]: {"pct": round(float(p) * 100, 1), "color": ["green", "yellow", "red"][i]}
             for i, p in enumerate(probabilities)
         }
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO evaluaciones (nombre, nivel, color, fecha, probabilidades) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    nombre,
-                    label,
-                    info["color"],
-                    datetime.now(ZONA_LIMA).strftime("%d/%m/%Y %H:%M"),
-                    json.dumps(probabilidades_dict, ensure_ascii=False),
-                ),
-            )
-            # Apilamos el id recién insertado para poder deshacerlo después
-            pila_deshacer.apilar(cursor.lastrowid)
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO evaluaciones (nombre, nivel, color, fecha, probabilidades) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    (
+                        nombre,
+                        label,
+                        info["color"],
+                        datetime.now(ZONA_LIMA).strftime("%d/%m/%Y %H:%M"),
+                        json.dumps(probabilidades_dict, ensure_ascii=False),
+                    ),
+                )
+                # Apilamos el id recién insertado para poder deshacerlo después
+                pila_deshacer.apilar(cursor.lastrowid)
 
-            # Si se pasa del tope, borrar los registros más antiguos
-            conn.execute(
-                "DELETE FROM evaluaciones WHERE id NOT IN ("
-                "  SELECT id FROM evaluaciones ORDER BY id DESC LIMIT ?"
-                ")",
-                (MAX_REGISTROS,),
-            )
+                # Si se pasa del tope, borrar los registros más antiguos.
+                # MySQL no permite seleccionar de la misma tabla que se está
+                # borrando directamente, por eso se envuelve en una subconsulta
+                # aparte (tabla derivada).
+                cursor.execute(
+                    "DELETE FROM evaluaciones WHERE id NOT IN ("
+                    "  SELECT id FROM ("
+                    "    SELECT id FROM evaluaciones ORDER BY id DESC LIMIT %s"
+                    "  ) AS recientes"
+                    ")",
+                    (MAX_REGISTROS,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
 
         # Armamos las recomendaciones recorriendo una lista enlazada propia
         lista_tips = ListaEnlazada()
@@ -256,11 +312,16 @@ def predict():
 @app.route("/historial")
 def ver_historial():
     # Mostrar lista de registros, más reciente primero
-    with get_db() as conn:
-        filas = conn.execute(
-            "SELECT nombre, nivel, color, fecha, probabilidades "
-            "FROM evaluaciones ORDER BY id DESC"
-        ).fetchall()
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT nombre, nivel, color, fecha, probabilidades "
+                "FROM evaluaciones ORDER BY id DESC"
+            )
+            filas = cursor.fetchall()
+    finally:
+        conn.close()
 
     registros = [
         {
@@ -277,8 +338,13 @@ def ver_historial():
 
 @app.route("/historial/limpiar", methods=["POST"])
 def limpiar_historial():
-    with get_db() as conn:
-        conn.execute("DELETE FROM evaluaciones")
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM evaluaciones")
+        conn.commit()
+    finally:
+        conn.close()
     pila_deshacer.elementos.clear()
     return redirect(url_for("ver_historial"))
 
@@ -288,8 +354,13 @@ def deshacer_historial():
     # Desapilamos el id de la última evaluación registrada y la borramos
     ultimo_id = pila_deshacer.desapilar()
     if ultimo_id is not None:
-        with get_db() as conn:
-            conn.execute("DELETE FROM evaluaciones WHERE id = ?", (ultimo_id,))
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM evaluaciones WHERE id = %s", (ultimo_id,))
+            conn.commit()
+        finally:
+            conn.close()
     return redirect(url_for("ver_historial"))
 
 
