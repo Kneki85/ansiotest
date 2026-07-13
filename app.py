@@ -5,6 +5,7 @@ ansiedad_app v2 — Flask backend con registro de estudiantes e historial
 import json
 import os
 import pickle
+import random
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -61,6 +62,16 @@ with open(MODEL_DIR / "model.json", "r", encoding="utf-8") as f:
 
 CLASSES: list[str] = meta["classes"]
 FEATURES: list[str] = meta["features"]
+
+# frases cortas para la tarjeta de "recuerda que" en el inicio
+FRASES = [
+    "Respirar hondo 10 segundos ya es un buen comienzo.",
+    "Un examen no define lo que vales.",
+    "Está bien pedir ayuda, no es debilidad.",
+    "Un paso a la vez es suficiente por hoy.",
+    "Avanzar despacio también es avanzar.",
+    "Tu ritmo también es válido.",
+]
 
 
 def get_db() -> pymysql.connections.Connection:
@@ -440,7 +451,11 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", nombre=session.get("nombre"))
+    return render_template(
+        "index.html",
+        nombre=session.get("nombre"),
+        frase=random.choice(FRASES),
+    )
 
 
 @app.route("/evaluacion")

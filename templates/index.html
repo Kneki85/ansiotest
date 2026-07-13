@@ -3,25 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evaluación de Ansiedad Estudiantil</title>
+  <title>AnsioTest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
 <div class="container narrow">
   <header>
-    <h1>Evaluación de <span>Ansiedad</span> Estudiantil</h1>
+    <h1>Ansio<span>Test</span></h1>
     <p>Herramienta de detección temprana para estudiantes universitarios.</p>
   </header>
 
   <div class="section-card center-card">
+    <div class="breathing-rings" aria-hidden="true">
+      <span class="ring"></span>
+      <span class="ring"></span>
+      <span class="ring"></span>
+      <span class="core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg></span>
+    </div>
     <div class="section-label">Bienvenido/a</div>
-    <p class="card-intro">Hola, <strong>{{ nombre }}</strong>. Tus resultados quedarán registrados en tu historial.</p>
+    <p class="card-intro" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+      <span class="avatar-circle">{{ nombre[0] | upper }}</span>
+      <span>Hola, <strong>{{ nombre }}</strong>. Tus resultados quedarán registrados en tu historial.</span>
+    </p>
 
     <a href="/evaluacion" class="submit-btn" style="display:block; text-align:center; text-decoration:none;">
       Comenzar evaluación →
     </a>
+  </div>
+
+  <div class="section-card" style="display:flex; align-items:center; gap:14px;">
+    <div class="avatar-circle" style="width:40px; height:40px; flex-shrink:0;" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px; height:18px;"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg>
+    </div>
+    <div>
+      <div class="section-label" style="margin-bottom:4px;">Recuerda que...</div>
+      <p style="font-size:0.9rem; color:var(--text);">{{ frase }}</p>
+    </div>
   </div>
 
   <div class="footer-link">
