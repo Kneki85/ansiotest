@@ -1,54 +1,59 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AnsioTest</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
-</head>
-<body>
-<div class="container narrow">
-  <header>
-    <h1>Ansio<span>Test</span></h1>
-    <p>Herramienta de detección temprana para estudiantes universitarios.</p>
-  </header>
+{% extends "_base_dashboard.html" %}
+{% block title %}AnsioTest{% endblock %}
+{% block page_title %}Hola, {{ nombre }}{% endblock %}
+{% block page_sub %}<p>Nos alegra que vuelvas por aquí.</p>{% endblock %}
 
-  <div class="section-card center-card">
-    <div class="breathing-rings" aria-hidden="true">
-      <span class="ring"></span>
-      <span class="ring"></span>
-      <span class="ring"></span>
-      <span class="core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg></span>
-    </div>
-    <div class="section-label">Bienvenido/a</div>
-    <p class="card-intro" style="display:flex; align-items:center; justify-content:center; gap:10px;">
-      <span class="avatar-circle">{{ nombre[0] | upper }}</span>
-      <span>Hola, <strong>{{ nombre }}</strong>. Tus resultados quedarán registrados en tu historial.</span>
-    </p>
+{% block content %}
 
-    <a href="/evaluacion" class="submit-btn" style="display:block; text-align:center; text-decoration:none;">
-      Comenzar evaluación →
-    </a>
+<div class="section-card center-card" style="margin-bottom:16px;">
+  <div class="breathing-rings" aria-hidden="true">
+    <span class="ring"></span>
+    <span class="ring"></span>
+    <span class="ring"></span>
+    <span class="core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg></span>
   </div>
+  <div class="section-label">Nueva evaluación</div>
+  <p class="card-intro">Tus resultados quedarán registrados en tu historial.</p>
+  <a href="/evaluacion" class="submit-btn" style="display:block; text-align:center; text-decoration:none; max-width:280px; margin:0 auto;">
+    Comenzar evaluación →
+  </a>
+</div>
 
-  <div class="section-card" style="display:flex; align-items:center; gap:14px;">
-    <div class="avatar-circle" style="width:40px; height:40px; flex-shrink:0;" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px; height:18px;"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg>
+<div class="section-card" style="margin-bottom:16px;">
+  <div class="section-label" style="margin-bottom:10px;">¿Cómo te sientes hoy?</div>
+  <form action="/animo" method="POST" class="mood-row">
+    {% for valor, etiqueta, color in estados_animo %}
+    <button type="submit" name="estado" value="{{ valor }}" class="mood-option {{ 'selected' if animo_hoy == valor else '' }}">
+      <span class="mood-dot" style="background: {{ color }};"></span>
+      {{ etiqueta }}
+    </button>
+    {% endfor %}
+  </form>
+  {% if animo_hoy %}
+  <p style="font-size:0.78rem; color:var(--muted); margin-top:10px;">Gracias por contarnos, quedó registrado por hoy.</p>
+  {% endif %}
+</div>
+
+<div class="dash-grid">
+  <div class="section-card tip-card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M8 15c1 1.3 2.4 2 4 2s3-0.7 4-2"/></svg>
     </div>
     <div>
-      <div class="section-label" style="margin-bottom:4px;">Recuerda que...</div>
-      <p style="font-size:0.9rem; color:var(--text);">{{ frase }}</p>
+      <h4>Recuerda que...</h4>
+      <p>{{ frase }}</p>
     </div>
   </div>
 
-  <div class="footer-link">
-    <a href="/historial">Ver historial de evaluaciones</a>
-  </div>
-  <div class="footer-link">
-    <a href="/logout">Cerrar sesión</a>
+  <div class="section-card tip-card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+    </div>
+    <div>
+      <h4>¿No sabes por dónde empezar?</h4>
+      <p>Dale a "Comenzar evaluación": son unas preguntas cortas y al final te mostramos tu nivel junto con recomendaciones.</p>
+    </div>
   </div>
 </div>
-</body>
-</html>
+
+{% endblock %}

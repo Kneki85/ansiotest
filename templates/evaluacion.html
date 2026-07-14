@@ -1,20 +1,9 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evaluación — {{ nombre }} · AnsioTest</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
-</head>
-<body>
-<div class="container">
-  <header>
-    <h1>Hola, <span>{{ nombre }}</span></h1>
-    <p>Completa los indicadores para obtener tu nivel de riesgo estimado.</p>
-  </header>
+{% extends "_base_dashboard.html" %}
+{% block title %}Evaluación — {{ nombre }} · AnsioTest{% endblock %}
+{% block page_title %}Nueva evaluación{% endblock %}
+{% block page_sub %}<p>Completa los indicadores para obtener tu nivel de riesgo estimado.</p>{% endblock %}
 
+{% block content %}
   <!-- PANTALLA: FORMULARIO -->
   <div id="form-screen">
 
@@ -134,12 +123,10 @@
       <button class="back-btn" onclick="goBack()">← Nueva evaluación</button>
       <a href="/historial" class="history-btn">Ver historial</a>
     </div>
-    <div class="footer-link" style="margin-top: 16px;">
-      <a href="/">Cambiar estudiante</a>
-    </div>
   </div>
-</div>
 
+{% endblock %}
+
+{% block scripts %}
 <script src="/static/script.js"></script>
-</body>
-</html>
+{% endblock %}

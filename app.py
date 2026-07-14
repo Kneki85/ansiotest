@@ -73,6 +73,15 @@ FRASES = [
     "Tu ritmo también es válido.",
 ]
 
+# (valor, etiqueta, color) para el check-in de ánimo del día
+ESTADOS_ANIMO = [
+    ("bien", "Bien", "#1f9d6c"),
+    ("tranquilo", "Tranquilo", "#6e63d6"),
+    ("normal", "Normal", "#8d93ab"),
+    ("cansado", "Cansado", "#b7791f"),
+    ("mal", "Mal", "#d1453d"),
+]
+
 
 def get_db() -> pymysql.connections.Connection:
     """Abre una conexión nueva a la base de datos MySQL.
@@ -190,7 +199,9 @@ class Pila:
         return len(self.elementos) == 0
 
 
-pila_deshacer = Pila()
+# nota: antes habia una pila_deshacer global aca, pero eso hacia que
+# un usuario pudiera deshacer la evaluacion de otro. ahora cada quien
+# tiene su propia pila guardada en su sesion (ver /predict y /historial)
 
 
 # --- de aca para abajo es lo nuevo que pidio el profe ---
@@ -455,13 +466,93 @@ def index():
         "index.html",
         nombre=session.get("nombre"),
         frase=random.choice(FRASES),
+        estados_animo=ESTADOS_ANIMO,
+        animo_hoy=session.get("animo_hoy"),
+        activo="inicio",
     )
+
+
+@app.route("/animo", methods=["POST"])
+@login_required
+def guardar_animo():
+    estado = request.form.get("estado", "")
+    valores_validos = {v for v, _, _ in ESTADOS_ANIMO}
+    if estado in valores_validos:
+        session["animo_hoy"] = estado
+    return redirect(url_for("index"))
 
 
 @app.route("/evaluacion")
 @login_required
 def evaluacion():
-    return render_template("evaluacion.html", nombre=session.get("nombre"))
+    return render_template("evaluacion.html", nombre=session.get("nombre"), activo="evaluacion")
+
+
+@app.route("/perfil")
+@login_required
+def perfil():
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT email, fecha_registro FROM usuarios WHERE id = %s",
+                (session.get("usuario_id"),),
+            )
+            usuario = cursor.fetchone()
+
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM evaluaciones WHERE nombre = %s",
+                (session.get("nombre"),),
+            )
+            total = cursor.fetchone()["total"]
+    finally:
+        conn.close()
+
+    return render_template(
+        "perfil.html",
+        nombre=session.get("nombre"),
+        email=usuario["email"] if usuario else "",
+        fecha_registro=usuario["fecha_registro"] if usuario else "",
+        total_evaluaciones=total,
+        activo="perfil",
+    )
+
+
+@app.route("/progreso")
+@login_required
+def progreso():
+    nombre_usuario = session.get("nombre")
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT nivel, color, fecha FROM evaluaciones "
+                "WHERE nombre = %s ORDER BY id DESC",
+                (nombre_usuario,),
+            )
+            filas = cursor.fetchall()
+    finally:
+        conn.close()
+
+    registros = [
+        {"nivel": f["nivel"], "color": f["color"], "fecha": f["fecha"]}
+        for f in filas
+    ]
+
+    # conteo por nivel, en el mismo orden que las clases del modelo
+    conteo_por_nivel = []
+    for nivel in CLASSES:
+        cantidad = sum(1 for r in registros if r["nivel"] == nivel)
+        color = RISK_INFO[nivel]["color"]
+        conteo_por_nivel.append((nivel, cantidad, color))
+
+    return render_template(
+        "progreso.html",
+        nombre=nombre_usuario,
+        registros=registros,
+        conteo_por_nivel=conteo_por_nivel,
+        activo="progreso",
+    )
 
 
 @app.route("/predict", methods=["POST"])
@@ -498,20 +589,28 @@ def predict():
                         json.dumps(probabilidades_dict, ensure_ascii=False),
                     ),
                 )
-                # Apilamos el id recién insertado para poder deshacerlo después
-                pila_deshacer.apilar(cursor.lastrowid)
+                # Apilamos el id recién insertado para poder deshacerlo después.
+                # va en la sesion del usuario, no en una pila global, para que
+                # cada quien deshaga solo sus propias evaluaciones
+                pila_usuario = Pila()
+                pila_usuario.elementos = session.get("pila_deshacer", [])
+                pila_usuario.apilar(cursor.lastrowid)
+                session["pila_deshacer"] = pila_usuario.elementos
 
-                # Si se pasa del tope, borrar los registros más antiguos.
+                # Si se pasa del tope, borrar los registros más antiguos
+                # de ESTE usuario (antes borraba entre todos, mezclando
+                # el limite de una cuenta con el de otra).
                 # MySQL no permite seleccionar de la misma tabla que se está
                 # borrando directamente, por eso se envuelve en una subconsulta
                 # aparte (tabla derivada).
                 cursor.execute(
-                    "DELETE FROM evaluaciones WHERE id NOT IN ("
+                    "DELETE FROM evaluaciones WHERE nombre = %s AND id NOT IN ("
                     "  SELECT id FROM ("
-                    "    SELECT id FROM evaluaciones ORDER BY id DESC LIMIT %s"
+                    "    SELECT id FROM evaluaciones WHERE nombre = %s "
+                    "    ORDER BY id DESC LIMIT %s"
                     "  ) AS recientes"
                     ")",
-                    (MAX_REGISTROS,),
+                    (nombre, nombre, MAX_REGISTROS),
                 )
             conn.commit()
         finally:
@@ -552,14 +651,17 @@ def predict():
 @login_required
 def ver_historial():
     query = request.args.get("q", "").strip()
+    nombre_usuario = session.get("nombre")
 
-    # lista completa, mas reciente primero (como ya estaba antes)
+    # solo las evaluaciones de la cuenta que inicio sesion (antes
+    # mostraba las de todos, no correspondia una vez que hay login)
     conn = get_db()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
                 "SELECT id, nombre, nivel, color, fecha, probabilidades "
-                "FROM evaluaciones ORDER BY id DESC"
+                "FROM evaluaciones WHERE nombre = %s ORDER BY id DESC",
+                (nombre_usuario,),
             )
             filas = cursor.fetchall()
     finally:
@@ -600,18 +702,22 @@ def ver_historial():
         registros=registros,
         query=query,
         busquedas_recientes=busquedas_recientes,
+        nombre=nombre_usuario,
+        activo="resultados",
     )
 
 
 @app.route("/historial/detalle/<int:registro_id>")
 @login_required
 def detalle_historial(registro_id):
+    nombre_usuario = session.get("nombre")
     conn = get_db()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
                 "SELECT id, nombre, nivel, color, fecha, probabilidades "
-                "FROM evaluaciones ORDER BY id DESC"
+                "FROM evaluaciones WHERE nombre = %s ORDER BY id DESC",
+                (nombre_usuario,),
             )
             filas = cursor.fetchall()
     finally:
@@ -646,33 +752,42 @@ def detalle_historial(registro_id):
         registro=registro,
         id_mas_antiguo=id_mas_antiguo,
         id_mas_reciente=id_mas_reciente,
+        nombre=nombre_usuario,
+        activo="resultados",
     )
 
 
 @app.route("/historial/limpiar", methods=["POST"])
 @login_required
 def limpiar_historial():
+    nombre_usuario = session.get("nombre")
     conn = get_db()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM evaluaciones")
+            cursor.execute("DELETE FROM evaluaciones WHERE nombre = %s", (nombre_usuario,))
         conn.commit()
     finally:
         conn.close()
-    pila_deshacer.elementos.clear()
+    session["pila_deshacer"] = []
     return redirect(url_for("ver_historial"))
 
 
 @app.route("/historial/deshacer", methods=["POST"])
 @login_required
 def deshacer_historial():
-    # Desapilamos el id de la última evaluación registrada y la borramos
-    ultimo_id = pila_deshacer.desapilar()
+    # Desapilamos el id de la última evaluación de ESTE usuario y la borramos
+    pila_usuario = Pila()
+    pila_usuario.elementos = session.get("pila_deshacer", [])
+    ultimo_id = pila_usuario.desapilar()
+    session["pila_deshacer"] = pila_usuario.elementos
     if ultimo_id is not None:
         conn = get_db()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM evaluaciones WHERE id = %s", (ultimo_id,))
+                cursor.execute(
+                    "DELETE FROM evaluaciones WHERE id = %s AND nombre = %s",
+                    (ultimo_id, session.get("nombre")),
+                )
             conn.commit()
         finally:
             conn.close()

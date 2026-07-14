@@ -1,0 +1,42 @@
+{% extends "_base_dashboard.html" %}
+{% block title %}Mi Progreso · AnsioTest{% endblock %}
+{% block page_title %}Mi progreso{% endblock %}
+{% block page_sub %}<p>Cómo han variado tus resultados a lo largo del tiempo.</p>{% endblock %}
+
+{% block content %}
+
+<div class="stat-row">
+  {% for nivel, cantidad, color in conteo_por_nivel %}
+  <div class="stat-card">
+    <div class="stat-num" style="color: var(--{{ color }});">{{ cantidad }}</div>
+    <div class="stat-label">Riesgo {{ nivel }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if registros %}
+<div class="section-card" style="margin-bottom:16px;">
+  <div class="section-label" style="margin-bottom:8px;">Total evaluado</div>
+  <p style="font-size:0.88rem; color:var(--muted);">Llevas <strong style="color:var(--text);">{{ registros | length }}</strong> evaluación{{ 'es' if registros | length != 1 else '' }} registrada{{ 's' if registros | length != 1 else '' }}.</p>
+</div>
+
+<div class="timeline">
+  {% for r in registros %}
+  <div class="timeline-row">
+    <span class="timeline-dot" style="background: var(--{{ r.color }});"></span>
+    <span class="timeline-fecha">{{ r.fecha }}</span>
+    <span class="timeline-nivel" style="color: var(--{{ r.color }});">Riesgo {{ r.nivel }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📈</div>
+  <p>Todavía no tienes evaluaciones para mostrar tu progreso.</p>
+  <a href="/evaluacion" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
+    Realizar primera evaluación
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

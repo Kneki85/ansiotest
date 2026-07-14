@@ -1,0 +1,37 @@
+{% extends "_base_dashboard.html" %}
+{% block title %}Perfil · AnsioTest{% endblock %}
+{% block page_title %}Tu perfil{% endblock %}
+{% block page_sub %}<p>Datos de tu cuenta.</p>{% endblock %}
+
+{% block content %}
+
+<div class="section-card">
+  <div class="profile-header">
+    <div class="profile-avatar-lg">{{ nombre[0] | upper }}</div>
+    <div>
+      <div style="font-size:1.1rem; font-weight:600; color:var(--text);">{{ nombre }}</div>
+      <div style="font-size:0.82rem; color:var(--muted);">{{ email }}</div>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;">
+    <div class="profile-row">
+      <span class="k">Nombre</span>
+      <span class="v">{{ nombre }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="k">Correo</span>
+      <span class="v">{{ email }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="k">Miembro desde</span>
+      <span class="v">{{ fecha_registro }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="k">Evaluaciones realizadas</span>
+      <span class="v">{{ total_evaluaciones }}</span>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

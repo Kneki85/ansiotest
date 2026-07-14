@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AnsioTest{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body style="padding: 0;">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">Ansio<span>Test</span></div>
+
+    <div class="sidebar-user">
+      <span class="avatar-circle">{{ nombre[0] | upper }}</span>
+      <span class="name">{{ nombre }}</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="/" class="{{ 'active' if activo == 'inicio' else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9"/></svg>
+        <span class="label">Inicio</span>
+      </a>
+      <a href="/perfil" class="{{ 'active' if activo == 'perfil' else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>
+        <span class="label">Perfil</span>
+      </a>
+      <a href="/evaluacion" class="{{ 'active' if activo == 'evaluacion' else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+        <span class="label">Evaluación</span>
+      </a>
+      <a href="/historial" class="{{ 'active' if activo == 'resultados' else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M11 19V5M18 19v-6"/></svg>
+        <span class="label">Resultados</span>
+      </a>
+      <a href="/progreso" class="{{ 'active' if activo == 'progreso' else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 7-8"/><path d="M15 8h4v4"/></svg>
+        <span class="label">Mi Progreso</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="label">Cerrar sesión</span>
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="main-topbar">
+      <div>
+        <h1>{% block page_title %}{% endblock %}</h1>
+        {% block page_sub %}{% endblock %}
+      </div>
+      <div class="notif-bell" title="Sin notificaciones nuevas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+      </div>
+    </div>
+
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

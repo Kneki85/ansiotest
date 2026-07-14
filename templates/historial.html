@@ -1,91 +1,79 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Historial · AnsioTest</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
-</head>
-<body>
-<div class="container">
-  <header>
-    <h1>Historial de <span>Evaluaciones</span></h1>
-    <p>Registro de todas las evaluaciones realizadas.</p>
-  </header>
+{% extends "_base_dashboard.html" %}
+{% block title %}Resultados · AnsioTest{% endblock %}
+{% block page_title %}Tus resultados{% endblock %}
+{% block page_sub %}<p>Registro de tus evaluaciones anteriores.</p>{% endblock %}
 
-  <!-- buscador (arbol) + cola de busquedas recientes -->
-  <form action="/historial" method="GET" class="name-form" style="margin-bottom: 16px;">
-    <div class="field">
-      <label for="q">Buscar por nombre</label>
-      <input type="text" id="q" name="q" placeholder="Ej: María" value="{{ query or '' }}" />
-    </div>
-    <button type="submit" class="submit-btn">Buscar</button>
-  </form>
+{% block content %}
 
-  {% if busquedas_recientes %}
-  <div class="footer-link" style="margin-bottom: 16px; text-align:left;">
-    <span>Búsquedas recientes: </span>
-    {% for b in busquedas_recientes %}
-    <a href="/historial?q={{ b }}" style="margin-right:8px;">{{ b }}</a>
-    {% endfor %}
+<!-- buscador (arbol) + cola de busquedas recientes -->
+<form action="/historial" method="GET" class="name-form" style="margin-bottom: 16px;">
+  <div class="field">
+    <label for="q">Buscar por nombre</label>
+    <input type="text" id="q" name="q" placeholder="Ej: María" value="{{ query or '' }}" />
   </div>
-  {% endif %}
+  <button type="submit" class="submit-btn">Buscar</button>
+</form>
 
-  {% if registros %}
-  <div class="historial-meta">
-    <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}{% if query %} para "{{ query }}"{% endif %}</span>
-    <div style="display:flex; gap:10px;">
-      <form action="/historial/deshacer" method="POST">
-        <button type="submit" class="clear-btn">↩ Deshacer última</button>
-      </form>
-      <form action="/historial/limpiar" method="POST" onsubmit="return confirm('¿Limpiar todo el historial?')">
-        <button type="submit" class="clear-btn">Limpiar historial</button>
-      </form>
-    </div>
-  </div>
+{% if busquedas_recientes %}
+<div class="footer-link" style="margin-bottom: 16px; text-align:left;">
+  <span>Búsquedas recientes: </span>
+  {% for b in busquedas_recientes %}
+  <a href="/historial?q={{ b }}" style="margin-right:8px;">{{ b }}</a>
+  {% endfor %}
+</div>
+{% endif %}
 
-  <div class="historial-list">
-    {% for r in registros %}
-    <a href="/historial/detalle/{{ r.id }}" class="historial-card" style="text-decoration:none; color:inherit; display:block;">
-      <div class="historial-info">
-        <span class="historial-nombre">{{ r.nombre }}</span>
-        <span class="historial-fecha">{{ r.fecha }}</span>
-      </div>
-      <div class="historial-badge {{ r.color }}">{{ r.nivel }}</div>
-      <div class="historial-probs">
-        {% for label, data in r.probabilidades.items() %}
-        <div class="mini-bar-row">
-          <span class="mini-label">{{ label }}</span>
-          <div class="bar-track">
-            <div class="bar-fill {{ data.color }}" style="width: {{ data.pct }}%"></div>
-          </div>
-          <span class="mini-pct">{{ data.pct }}%</span>
-        </div>
-        {% endfor %}
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-
-  {% else %}
-  <div class="empty-state">
-    <div class="empty-icon">📋</div>
-    {% if query %}
-    <p>No se encontraron evaluaciones para "{{ query }}".</p>
-    {% else %}
-    <p>No hay evaluaciones registradas todavía.</p>
-    {% endif %}
-    <a href="/" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
-      {% if query %}Volver al historial{% else %}Realizar primera evaluación{% endif %}
-    </a>
-  </div>
-  {% endif %}
-
-  <div class="footer-link">
-    <a href="/">← Volver al inicio</a>
+{% if registros %}
+<div class="historial-meta">
+  <span>{{ registros | length }} registro{% if registros | length != 1 %}s{% endif %}{% if query %} para "{{ query }}"{% endif %}</span>
+  <div style="display:flex; gap:10px;">
+    <form action="/historial/deshacer" method="POST">
+      <button type="submit" class="clear-btn">↩ Deshacer última</button>
+    </form>
+    <form action="/historial/limpiar" method="POST" onsubmit="return confirm('¿Limpiar todo tu historial?')">
+      <button type="submit" class="clear-btn">Limpiar historial</button>
+    </form>
   </div>
 </div>
-</body>
-</html>
+
+<div class="historial-list">
+  {% for r in registros %}
+  <a href="/historial/detalle/{{ r.id }}" class="historial-card" style="text-decoration:none; color:inherit; display:block;">
+    <div class="historial-info">
+      <span class="historial-nombre">{{ r.nombre }}</span>
+      <span class="historial-fecha">{{ r.fecha }}</span>
+    </div>
+    <div class="historial-badge {{ r.color }}">{{ r.nivel }}</div>
+    <div class="historial-probs">
+      {% for label, data in r.probabilidades.items() %}
+      <div class="mini-bar-row">
+        <span class="mini-label">{{ label }}</span>
+        <div class="bar-track">
+          <div class="bar-fill {{ data.color }}" style="width: {{ data.pct }}%"></div>
+        </div>
+        <span class="mini-pct">{{ data.pct }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📋</div>
+  {% if query %}
+  <p>No se encontraron evaluaciones para "{{ query }}".</p>
+  <a href="/historial" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
+    Volver al historial
+  </a>
+  {% else %}
+  <p>No hay evaluaciones registradas todavía.</p>
+  <a href="/evaluacion" class="submit-btn" style="display:inline-block; text-decoration:none; width:auto; padding: 12px 28px;">
+    Realizar primera evaluación
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
