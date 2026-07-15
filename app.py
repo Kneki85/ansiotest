@@ -532,6 +532,22 @@ def login():
             session["usuario_id"] = usuario["id"]
             session["nombre"] = usuario["nombre"]
             session["email"] = email
+
+            # reconstruyo la pila de "deshacer" con lo que ya tiene en la BD,
+            # asi el boton funciona tambien con evaluaciones de sesiones
+            # anteriores, no solo con las que se hagan a partir de ahora
+            conn = get_db()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT id FROM evaluaciones WHERE nombre = %s ORDER BY id ASC",
+                        (usuario["nombre"],),
+                    )
+                    ids_existentes = [fila["id"] for fila in cursor.fetchall()]
+            finally:
+                conn.close()
+            session["pila_deshacer"] = ids_existentes
+
             return redirect(url_for("index"))
         error = "Correo o contraseña incorrectos."
 
@@ -881,6 +897,7 @@ def predict():
 @login_required
 def ver_historial():
     query = request.args.get("q", "").strip()
+    nada_que_deshacer = request.args.get("nada_que_deshacer") == "1"
     nombre_usuario = session.get("nombre")
 
     # solo las evaluaciones de la cuenta que inicio sesion (antes
@@ -953,6 +970,7 @@ def ver_historial():
         pagina=pagina,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        nada_que_deshacer=nada_que_deshacer,
     )
 
 
@@ -1040,7 +1058,10 @@ def deshacer_historial():
             conn.commit()
         finally:
             conn.close()
-    return redirect(url_for("ver_historial"))
+        return redirect(url_for("ver_historial"))
+
+    # pila vacia: no habia nada que deshacer, aviso en vez de quedarme callado
+    return redirect(url_for("ver_historial", nada_que_deshacer=1))
 
 
 if __name__ == "__main__":
